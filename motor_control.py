@@ -152,5 +152,3 @@ if __name__ == "__main__":
         motor_two_process.kill()
 
     GPIO.cleanup()
-
-    print('a')
