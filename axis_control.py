@@ -62,10 +62,10 @@ class Axis:
         else:
             self.current_position -= self.step_resolution
 
-    def axis_while_loop(self, velocity, direction):
+    def axis_while_loop(self, velocity, direction, next_position):
         # Main motor function, moves the motor and updates it's dynamic values
         GPIO.output(self.direction_pin, direction)
-        while not self.stop and velocity != 0:
+        while not self.stop and velocity != 0 and round(self.current_position,3) != round(next_position, 3):
             self.motor_single_step(velocity)
             self.update_axis_status(velocity, direction)
             self.check_axis_kill_switches()
@@ -192,15 +192,15 @@ if __name__ == "__main__":
     y_axis = manager.Axis(axis_name='Y axis', direction_pin=38, step_pin=40, kill_switch_i_pin=24,
                           kill_switch_f_pin=27, direction=CW, step_resolution=0.05, axis_length=1500)
 
+    homing_sequence(x_axis, y_axis, x_axis_home_position, y_axis_home_position)
+
     x_axis_status = x_axis.get_values()
     y_axis_status = y_axis.get_values()
-
-    homing_sequence(x_axis, y_axis, x_axis_home_position, y_axis_home_position)
 
     # These are the axis movement instructions
     instructions = [{'velocity': {'x': 300, 'y': 500}, 'position': {'x': 500, 'y': 0}},
                     {'velocity': {'x': 400, 'y': 400}, 'position': {'x': 500, 'y': 500}},
-                    {'velocity': {'x': 500, 'y': 300}, 'position': {'x': 1, 'y': 0}}]
+                    {'velocity': {'x': 500, 'y': 300}, 'position': {'x': 0, 'y': 0}}]
 
     _ = input('Press enter twice to begin sequence.')
     # This is the programs main loop, going through the instructions provided
@@ -209,24 +209,26 @@ if __name__ == "__main__":
         x_instructions = calc_instructions_for_next_position(x_axis_status, instruction['position']['x'])
         x_axis_velocity = instruction['velocity']['x']
         x_axis_direction = x_instructions['direction']
-        x_axis_step_amount = x_instructions['steps_amount']
 
         y_instructions = calc_instructions_for_next_position(y_axis_status, instruction['position']['y'])
         y_axis_velocity = instruction['velocity']['y']
         y_axis_direction = y_instructions['direction']
-        y_axis_step_amount = y_instructions['steps_amount']
 
         print(f'Step #{step + 1}: \n'
-              f"{x_axis_status['axis_name']} will move in speed of {instruction['velocity']['x']} "
-              f"[steps/second] in direction {x_instructions['direction']}\n"
-              f"{y_axis_status['axis_name']} will move in speed of {instruction['velocity']['y']} "
-              f"[steps/second] in direction {y_instructions['direction']}")
+              f"{x_axis_status['axis_name']} will move from position {x_axis_status['current_position']:.3f} to "
+              f"position {instruction['position']['x']} in speed of {instruction['velocity']['x']} [steps/second] in "
+              f"direction {x_instructions['direction']}\n"
+              f"{y_axis_status['axis_name']} will move from position {y_axis_status['current_position']:.3f} to "
+              f"position {instruction['position']['y']} in speed of {instruction['velocity']['y']} [steps/second] in "
+              f"direction {y_instructions['direction']}\n")
 
         # Set a movement process for each motor
-        x_axis_process = multiprocessing.Process(target=x_axis.axis_for_loop,
-                                                 args=(x_axis_velocity, x_axis_direction, x_axis_step_amount,))
-        y_axis_process = multiprocessing.Process(target=y_axis.axis_for_loop,
-                                                 args=(y_axis_velocity, y_axis_direction, y_axis_step_amount,))
+        x_axis_process = multiprocessing.Process(target=x_axis.axis_while_loop,
+                                                 args=(x_axis_velocity, x_axis_direction,
+                                                       instruction['position']['x'],))
+        y_axis_process = multiprocessing.Process(target=y_axis.axis_while_loop,
+                                                 args=(y_axis_velocity, y_axis_direction,
+                                                       instruction['position']['y'],))
 
         # Start the process
         x_axis_process.start()
@@ -244,8 +246,8 @@ if __name__ == "__main__":
             if x_axis_status['done_running'] and y_axis_status['done_running']:
                 not_done = False
 
-        print(f"Current {x_axis_status['axis_name']} position - {x_axis_status['current_position']:.2f} [mm]")
-        print(f"Current {y_axis_status['axis_name']} position - {y_axis_status['current_position']:.2f} [mm]\n")
+        print(f"Current {x_axis_status['axis_name']} position - {abs(x_axis_status['current_position']):.2f} [mm]")
+        print(f"Current {y_axis_status['axis_name']} position - {abs(y_axis_status['current_position']):.2f} [mm]\n")
 
         # Kill movement process
         x_axis_process.kill()
