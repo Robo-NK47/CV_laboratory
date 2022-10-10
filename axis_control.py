@@ -4,6 +4,8 @@ import multiprocessing
 from multiprocessing.managers import BaseManager
 from gpiozero import Button
 from tqdm.auto import tqdm
+from tkinter import *
+from tkinter.ttk import Style
 
 
 class Axis:
@@ -172,6 +174,7 @@ def homing_sequence(_x_axis, _y_axis, _x_axis_home_position, _y_axis_home_positi
 
 
 if __name__ == "__main__":
+
     x_axis_home_position = 100
     y_axis_home_position = 50
 
@@ -215,14 +218,11 @@ if __name__ == "__main__":
         y_axis_direction = y_instructions['direction']
 
         print(f'Step #{step + 1}: \n'
-              f"{x_axis_status['axis_name']} will move from position {x_axis_status['current_position']:.3f} to "
-              f"position {instruction['position']['x']} in speed of {instruction['velocity']['x']} [steps/second] in "
-              f"direction {x_instructions['direction']}\n"
-              f"{y_axis_status['axis_name']} will move from position {y_axis_status['current_position']:.3f} to "
-              f"position {instruction['position']['y']} in speed of {instruction['velocity']['y']} [steps/second] in "
-              f"direction {y_instructions['direction']}\n")
+              f"From ({x_axis_status['current_position']:.2f}, {y_axis_status['current_position']:.2f}) [mm] to "
+              f"({instruction['position']['x']:.2f}, {instruction['position']['y']:.2f}) [mm] in speeds of "
+              f"({instruction['velocity']['x']}, {instruction['velocity']['y']}) [steps/second].")
 
-        # Set a movement process for each motor
+        # Set a movement process for each axis
         x_axis_process = multiprocessing.Process(target=x_axis.axis_while_loop,
                                                  args=(x_axis_velocity, x_axis_direction,
                                                        instruction['position']['x'],))
@@ -235,14 +235,13 @@ if __name__ == "__main__":
         y_axis_process.start()
 
         # Wait for process to run
-        # time.sleep(instruction['step_duration'])
         not_done = True
         while not_done:
-            # Get updated dynamic values
+            # Get updated values
             x_axis_status = x_axis.get_values()
             y_axis_status = y_axis.get_values()
 
-            # check if all motors are done
+            # check if all axis are done
             if x_axis_status['done_running'] and y_axis_status['done_running']:
                 not_done = False
 
@@ -253,7 +252,7 @@ if __name__ == "__main__":
         x_axis_process.kill()
         y_axis_process.kill()
 
-        # reset the motor's run flag
+        # reset the axis's run flag
         x_axis.reset_axis_run()
         y_axis.reset_axis_run()
 
